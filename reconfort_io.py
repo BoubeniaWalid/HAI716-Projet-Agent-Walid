@@ -33,6 +33,7 @@ __all__ = [
     "charger_dictionnaire",
     "charger_armoire",
     "charger_scenario",
+    "PerceptionLocale",
     "normaliser",
     "Trace",
 ]
@@ -124,6 +125,30 @@ def charger_armoire(chemin: str | Path) -> Dict[str, Any]:
 def charger_scenario(chemin: str | Path) -> Dict[str, Any]:
     """Charge un fichier scenario. Voir l'enonce, section 5.4."""
     return _lire_json(chemin, "robot-reconfort/scenario")
+
+
+class PerceptionLocale:
+    """Interface du simulateur qui expose uniquement les cases voisines."""
+
+    def __init__(self, carte: Dict[str, Any]) -> None:
+        self._grille = carte["grille"]
+        self._legende = carte["legende"]
+
+    def percevoir(self, position: Sequence[int], direction: str) -> str:
+        """Retourne la nature d'une seule case voisine."""
+        row_delta, column_delta = {
+            "N": (-1, 0),
+            "S": (1, 0),
+            "E": (0, 1),
+            "O": (0, -1),
+        }[direction]
+        row = position[0] + row_delta
+        column = position[1] + column_delta
+        if row < 0 or column < 0:
+            raise IndexError("Perception d'un voisin hors de la carte")
+        if row >= len(self._grille) or column >= len(self._grille[row]):
+            raise IndexError("Perception d'un voisin hors de la carte")
+        return self._legende.get(self._grille[row][column], self._grille[row][column])
 
 
 # ---------------------------------------------------------------------------
