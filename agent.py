@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Squelette de l'agent du projet Robot de reconfort.
-"""
 
 from __future__ import annotations
 
@@ -12,6 +10,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import reconfort_io as rio
 from validation import valider_entrees
+from erreurs.OutOfBoundError import *
 
 
 Position = Tuple[int, int]
@@ -23,7 +22,7 @@ DIRECTIONS: Dict[str, Tuple[int, int]] = {
     "O": (0, -1),
 }
 
-
+#------------------------------MEMOIRE------------------------------
 @dataclass
 class CarteMentale:
     """Carte construite uniquement a partir des perceptions du robot."""
@@ -51,6 +50,7 @@ class MemoireRobot:
     contenus_casiers: Dict[Position, Optional[str]] = field(default_factory=dict)
     objet_transporte: Optional[str] = None
 
+#-------------------------------------------------------------------
 
 def voisins(position: Position) -> Iterable[Tuple[str, Position]]:
     """Retourne les quatre voisins dans un ordre deterministe."""
@@ -120,21 +120,27 @@ class Agent:
                 largeur=dimensions["largeur"],
             ),
         )
+    #------------------------------PERCEPTION------------------------------
+    #note: c'est une sous-methode servant a bien isoler l'acces a la grille et a le confiner a seulement les cases voisines
+    def _percevoirVoisin(self, direction : str) -> str:
+        """Renvoie la nature de la case voisine de la direction correspondante"""
+        row_delta, column_delta = DIRECTIONS[direction]
+        row= self.memoire.position[0]+row_delta
+        column= self.memoire.position[1]+column_delta
 
-    def percevoir(self) -> Dict[str, str]:
-        """perception fournie par le simulateur."""
-        # Le robot ne peut pas  lire la carte["grille"].
-        raise NotImplementedError("brancher la perception locale du simulateur")
+        #gestion des voisins qui sont en dehors de la carte
+        if row < 0 or column < 0 or row >= self.memoire.carte.hauteur or column >= self.memoire.carte.largeur:
+            raise OutOfBoundError("Perception d'un voisin se situant en dehors de la carte")
+        return self.carte["grille"][row][column]
 
-    def memoriser_perception(self, perception: Dict[str, str]) -> None:
-        """Ajoute les quatre cases observees a la carte mentale."""
-        for direction, nature in perception.items():
-            row_delta, column_delta = DIRECTIONS[direction]
-            position = (
-                self.memoire.position[0] + row_delta,
-                self.memoire.position[1] + column_delta,
-            )
+    
+    def percevoir(self) -> None:
+        """perception des cases voisines et ajout de celles-ci a la carte mentale."""
+        for (direction, position) in voisins(self.memoire.position):
+            nature= self._percevoirVoisin(direction)
             self.memoire.carte.mettre_a_jour(position, nature)
+    
+    #-------------------------------------------------------------------    
 
     def choisir_action(self, demande: dict) -> Tuple[str, Optional[str]]:
         """Retourne l'action suivante;  a implementer."""
@@ -160,8 +166,11 @@ class Agent:
         )
 
     def traiter_demande(self, demande: dict) -> None:
+        #--boucle jusqu'a avoir traite la demande
+        self.percevoir()
         action, argument = self.choisir_action(demande)
         self.executer_action(demande, action, argument)
+        #--
         self.trace.ajouter_livraison(
             demande=demande["numero"],
             resident=demande["resident"],
