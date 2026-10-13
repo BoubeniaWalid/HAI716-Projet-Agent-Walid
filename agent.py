@@ -155,7 +155,7 @@ class Agent:
         raise NameError("Recherche d'un mot ne se situant pas dans la legende.")
 
     def choisir_action(self, demande: dict) -> Tuple[str, Optional[str]]:
-        """Retourne l'action suivante;  a finir d'implementer."""
+        """Retourne l'action suivante."""
         perception= self.percevoir()
         self.memoriser_perception(perception)
         #-----L'agent doit aller jusqu'au dictionnaire et trouver l'emotion du resident-----
