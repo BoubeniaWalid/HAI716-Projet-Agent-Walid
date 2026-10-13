@@ -165,28 +165,23 @@ class Agent:
                 return "CHERCHER", "dictionnaire"
             #---L'agent n'est pas a cote du dictionnaire---
             else:
-                #avancer vers le dictionnaire
                 return "AVANCER", "dictionnaire"
 
         #-----L'agent doit aller jusqu'a l'armoire et prendre l'objet correspondant-----
         elif self.memoire.objet_transporte==None:
             #---L'agent est a cote de l'armoire---
             if self.symbole("armoire") in perception.values():
-                #chercher l'objet
                 return "CHERCHER", "armoire"
             #---L'agent n'est pas a cote de l'armoire---
             else:
-                #avancer vers l'armoire
                 return "AVANCER", "armoire"
         #-----L'agent doit aller jusqu'au resident et lui donner l'objet-----
         else:
             #---L'agent est a cote du resident---
             if self.symbole("resident") in perception.values():
-                #donner l'objet
                 return "DONNER", demande["resident"]
             #---L'agent n'est pas a cote du resident---
             else:
-                #avancer vers le resident
                 return "AVANCER", demande["resident"]
 
     def executer_action(
