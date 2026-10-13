@@ -10,7 +10,6 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import reconfort_io as rio
 from validation import valider_entrees
-from erreurs.OutOfBoundError import *
 
 
 Position = Tuple[int, int]
@@ -48,6 +47,7 @@ class MemoireRobot:
     casier: Position
     carte: CarteMentale
     contenus_casiers: Dict[Position, Optional[str]] = field(default_factory=dict)
+    emotion_resident: Optional[Tuple[str, str]] = None
     objet_transporte: Optional[str] = None
 
 #-------------------------------------------------------------------
@@ -122,30 +122,72 @@ class Agent:
         )
     #------------------------------PERCEPTION------------------------------
     #note: c'est une sous-methode servant a bien isoler l'acces a la grille et a le confiner a seulement les cases voisines
-    def _percevoirVoisin(self, direction : str) -> str:
+    def percevoir_voisin(self, direction : str) -> str:
         """Renvoie la nature de la case voisine de la direction correspondante"""
         row_delta, column_delta = DIRECTIONS[direction]
         row= self.memoire.position[0]+row_delta
         column= self.memoire.position[1]+column_delta
-
         #gestion des voisins qui sont en dehors de la carte
         if row < 0 or column < 0 or row >= self.memoire.carte.hauteur or column >= self.memoire.carte.largeur:
-            raise OutOfBoundError("Perception d'un voisin se situant en dehors de la carte")
+            raise IndexError("Perception d'un voisin se situant en dehors de la carte")
         return self.carte["grille"][row][column]
 
-    
-    def percevoir(self) -> None:
-        """perception des cases voisines et ajout de celles-ci a la carte mentale."""
+    def percevoir(self) -> Dict[str, str]:
+        """Perception des cases voisines."""
+        natures_voisins= {}
+        for direction in DIRECTIONS.keys():
+            natures_voisins[direction]= self._percevoir_voisin(direction)
+        return natures_voisins
+
+    def memoriser_perception(self, perception: Dict[str, str]) -> None:
+        """Ajoute les quatre cases observees a la carte mentale."""
         for (direction, position) in voisins(self.memoire.position):
-            nature= self._percevoirVoisin(direction)
+            nature= perception[direction]
             self.memoire.carte.mettre_a_jour(position, nature)
     
     #-------------------------------------------------------------------    
 
+    def symbole(self, mot : str) -> str:
+        """Renvoie le symbole correspondant au mot"""
+        for s, m in self.carte["legende"].items():
+            if m==mot:
+                return s
+        raise NameError("Recherche d'un mot ne se situant pas dans la legende.")
+
     def choisir_action(self, demande: dict) -> Tuple[str, Optional[str]]:
-        """Retourne l'action suivante;  a implementer."""
-        del demande
-        return "ATTENDRE", None
+        """Retourne l'action suivante;  a finir d'implementer."""
+        perception= self.percevoir()
+        self.memoriser_perception(perception)
+        #-----L'agent doit aller jusqu'au dictionnaire et trouver l'emotion du resident-----
+        if self.memoire.emotion_resident==None:
+            #---L'agent est a cote du dictionnaire---
+            if self.symbole("dictionnaire") in perception.values():
+                return "CHERCHER", "dictionnaire"
+            #---L'agent n'est pas a cote du dictionnaire---
+            else:
+                #avancer vers le dictionnaire
+                return "AVANCER", "dictionnaire"
+
+        #-----L'agent doit aller jusqu'a l'armoire et prendre l'objet correspondant-----
+        elif self.memoire.objet_transporte==None:
+            #---L'agent est a cote de l'armoire---
+            if self.symbole("armoire") in perception.values():
+                #chercher l'objet
+                return "CHERCHER", "armoire"
+            #---L'agent n'est pas a cote de l'armoire---
+            else:
+                #avancer vers l'armoire
+                return "AVANCER", "armoire"
+        #-----L'agent doit aller jusqu'au resident et lui donner l'objet-----
+        else:
+            #---L'agent est a cote du resident---
+            if self.symbole("resident") in perception.values():
+                #donner l'objet
+                return "DONNER", demande["resident"]
+            #---L'agent n'est pas a cote du resident---
+            else:
+                #avancer vers le resident
+                return "AVANCER", demande["resident"]
 
     def executer_action(
         self,
@@ -167,7 +209,6 @@ class Agent:
 
     def traiter_demande(self, demande: dict) -> None:
         #--boucle jusqu'a avoir traite la demande
-        self.percevoir()
         action, argument = self.choisir_action(demande)
         self.executer_action(demande, action, argument)
         #--
@@ -182,6 +223,8 @@ class Agent:
             succes=False,
             motif_echec="agent non implemente",
         )
+        self.memoire.emotion_resident = None
+        del demande
 
     def executer(self, demandes: Sequence[dict]) -> None:
         for demande in demandes:
