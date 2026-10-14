@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import sys
+import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -28,7 +29,20 @@ class CarteMentale:
 
     hauteur: int
     largeur: int
+    depart: InitVar[Position]
+    armoire: InitVar[Position]
+    dictionnaire: InitVar[Position]
+    residents: InitVar[List[Position]]
     cases: Dict[Position, str] = field(default_factory=dict)
+    #InitVar sert a dire que les attributs ne sont utilises que pendant l'initialisation et ne peuvent plus etre utilises apres
+
+    def __post_init__(self, depart: Position, armoire: Position, dictionnaire: Position, residents: List[Position]):
+        self.cases[depart]= "depart du robot"
+        self.cases[armoire]= "armoire"
+        self.cases[dictionnaire]= "dictionnaire"
+        for resident in residents:
+            self.cases[resident]= "resident"
+
 
     def connaitre(self, position: Position) -> str:
         """Les cases inconnues sont supposees libres pour planifier."""
@@ -38,7 +52,7 @@ class CarteMentale:
         self.cases[position] = nature
 
     def est_traversable(self, position: Position) -> bool:
-        return self.connaitre(position) in {"inconnu", "libre"}
+        return self.connaitre(position) in {"inconnu", "libre", "depart du robot"}
 
 
 @dataclass
@@ -120,7 +134,11 @@ class Agent:
             carte=CarteMentale(
                 hauteur=dimensions["hauteur"],
                 largeur=dimensions["largeur"],
-            ),
+                depart= depart,
+                armoire= tuple(carte["armoire"]["position"]),
+                dictionnaire= tuple(carte["dictionnaire"]["position"]),
+                residents= list([tuple(resident["position"]) for resident in carte["residents"]])
+            )
         )
     #------------------------------PERCEPTION------------------------------
     #note: c'est une sous-methode servant a bien isoler l'acces a la grille et a le confiner a seulement les cases voisines
@@ -143,12 +161,38 @@ class Agent:
     
     #-------------------------------------------------------------------    
 
-    def symbole(self, mot : str) -> str:
-        """Renvoie le symbole correspondant au mot"""
-        for s, m in self.carte["legende"].items():
-            if m==mot:
+    def symbole(self, nature : str) -> str:
+        """Renvoie le symbole correspondant a la nature de la case"""
+        for s, nat in self.carte["legende"].items():
+            if nat==nature:
                 return s
-        raise NameError("Recherche d'un mot ne se situant pas dans la legende.")
+        raise NameError("Recherche du symbole d'une nature inconnue, nature: ", nature,".")
+
+    def afficher_carte_mentale(self, direction : Optional[str]=None, title : Optional[str]= None) -> None:
+        if title is not None:
+            print("--------",title,"--------")
+        for row in range(self.memoire.carte.hauteur):
+            row_cases= ""
+            for column in range(self.memoire.carte.largeur):
+                position= (row, column)
+                nature= self.memoire.carte.cases.get(position)
+                if self.memoire.position==position:
+                    if direction=="N":
+                        row_cases+= "^"
+                    elif direction=="S":
+                        row_cases+= "v"
+                    elif direction=="E":
+                        row_cases+= ">"
+                    elif direction=="O":
+                        row_cases+= "<"
+                    else:
+                        row_cases+= "-"
+                elif self.memoire.carte.est_traversable(position) and nature!="depart du robot":
+                    row_cases+= self.symbole("libre")
+                else:
+                    row_cases+=self.symbole(nature)
+            print(row_cases)
+
 
     def _adjacent_a(self, position: Position) -> bool:
         return any(voisin == position for _, voisin in voisins(self.memoire.position))
@@ -276,12 +320,19 @@ class Agent:
             commentaire=None,
         )
 
-    def traiter_demande(self, demande: dict) -> None:
+    def traiter_demande(self, demande: dict, avec_affichage : Optional[bool]=True) -> None:
         while True:
+            if avec_affichage:
+                time.sleep(0.25)
             action, argument = self.choisir_action(demande)
             perception = self.percevoir()
             objet_avant = self.memoire.objet_transporte
             self.executer_action(demande, action, argument, perception)
+            if avec_affichage:
+                if action=="AVANCER":
+                    self.afficher_carte_mentale(argument, "Carte mentale après action:")
+                else:
+                    self.afficher_carte_mentale(None, "Carte mentale après action:")
 
             if action == "DONNER":
                 emotion, intensite = self.memoire.emotion_resident or (None, None)
@@ -304,9 +355,11 @@ class Agent:
             if action in {"CONSULTER", "PRENDRE"}:
                 continue
 
-    def executer(self, demandes: Sequence[dict]) -> None:
+    def executer(self, demandes: Sequence[dict], avec_affichage : Optional[bool]=True) -> None:
+        if avec_affichage:
+            self.afficher_carte_mentale(None, "Carte mentale initiale:")
         for demande in demandes:
-            self.traiter_demande(demande)
+            self.traiter_demande(demande, avec_affichage)
 
 
 def charger_entrees(argv: Sequence[str]):
