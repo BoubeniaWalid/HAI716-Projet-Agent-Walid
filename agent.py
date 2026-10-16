@@ -363,15 +363,16 @@ class Agent:
 
 
 def charger_entrees(argv: Sequence[str]):
-    if len(argv) != 5:
+    if len(argv) != 6:
         raise rio.ErreurFichier(
-            "usage : agent.py carte.json scenario.json donnees trace.json"
+            "usage : agent.py carte.json scenario.json donnees trace.json avec_affichage(bool)"
         )
 
     chemin_carte = Path(argv[1])
     chemin_scenario = Path(argv[2])
     dossier_donnees = Path(argv[3])
     chemin_sortie = Path(argv[4])
+    avec_affichage = (argv[5]=="True")
 
     carte = rio.charger_carte(chemin_carte)
     scenario = rio.charger_scenario(chemin_scenario)
@@ -380,18 +381,18 @@ def charger_entrees(argv: Sequence[str]):
         dossier_donnees / f"{scenario['armoire']}.json"
     )
     valider_entrees(carte, scenario, dictionnaire, armoire)
-    return carte, scenario, dictionnaire, armoire, chemin_sortie
+    return carte, scenario, dictionnaire, armoire, chemin_sortie, avec_affichage
 
 
 def main(argv: Sequence[str]) -> int:
     try:
-        carte, scenario, dictionnaire, armoire, chemin_sortie = charger_entrees(
+        carte, scenario, dictionnaire, armoire, chemin_sortie, avec_affichage= charger_entrees(
             argv
         )
         trace = rio.Trace(
             nom_carte=carte["nom"],
             nom_scenario=scenario["nom"],
-            equipe=["A completer", "A completer"],
+            equipe=["BOUBENIA Walid", "BARRE-GUETROT Ilan"],
         )
         simulateur = rio.PerceptionLocale(carte)
         agent = Agent(
@@ -401,7 +402,7 @@ def main(argv: Sequence[str]) -> int:
             trace,
             simulateur.percevoir,
         )
-        agent.executer(scenario["demandes"])
+        agent.executer(scenario["demandes"], avec_affichage)
         trace.ecrire(chemin_sortie)
         return 0
     except (rio.ErreurFichier, KeyError, TypeError, ValueError) as err:
