@@ -49,6 +49,8 @@ class CarteMentale:
         return self.cases.get(position, "inconnu")
 
     def mettre_a_jour(self, position: Position, nature: str) -> None:
+        if position[0]<0 or position[0]>=self.hauteur or position[1]<0 or position[1]>=self.largeur:
+            raise IndexError("Mise a jour d'une case hors de la carte")
         self.cases[position] = nature
 
     def est_traversable(self, position: Position) -> bool:

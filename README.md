@@ -17,10 +17,10 @@ Dépendances : *aucune*.
 ## Tester
 
 ```
-<votre commande de test>
+./test.sh
 ```
 
-*Il n'y a pour l'instant aucun test d'implémenté.*
+*Les tests sont uniquement composés de tests unitaires, ils testent la perception de l'agent et partiellement la mémoire*
 
 ## Organisation du code
 
@@ -30,6 +30,7 @@ Dépendances : *aucune*.
 | `reconfort_io.py` | lecture des fichiers d'entrée et construction du fichier de sortie |
 |`validation.py`| vérification de la validité des fichiers d'entrée|
 |`start.sh`| démarrage du projet|
+|`test.sh`| exécution des tests|
 
 ## État
 
@@ -42,9 +43,11 @@ Dépendances : *aucune*.
 - *La boucle de décision*
 - *Un affichage console du trajet du robot*
 - *Un fichier de lancement*
+- *Les tests des méthodes de perception et mémoire(partiellement)*
+- *Un fichier de test*
 
 **Ce qui ne marche pas.** 
-- *Les tests des différentes méthodes (pas encore implémentés)*
+- *Les tests des méthodes de mémoire(reste), de décision et de validation des fichiers d'entrée*
 
 ## Vidéo
 
