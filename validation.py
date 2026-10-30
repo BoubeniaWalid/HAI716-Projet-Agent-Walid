@@ -45,6 +45,24 @@ def _valider_carte(carte: dict) -> None:
         and largeur > 0,
         "les dimensions de la carte sont invalides",
     )
+    legende = carte.get("legende")
+    _exiger(isinstance(legende, dict), "carte.legende manquante ou invalide")
+    grille = carte.get("grille")
+    _exiger(
+        isinstance(grille, list)
+        and len(grille) == hauteur
+        and all(isinstance(ligne, str) and len(ligne) == largeur for ligne in grille),
+        "carte.grille non rectangulaire ou incoherente avec les dimensions",
+    )
+    symboles_attendus = {"mur", "libre", "depart du robot", "armoire", "dictionnaire", "resident"}
+    _exiger(
+        set(legende.values()) == symboles_attendus,
+        "carte.legende incomplete ou incoherente",
+    )
+    _exiger(
+        all(symbole in legende for ligne in grille for symbole in ligne),
+        "symbole inconnu dans carte.grille",
+    )
     _position_valide(carte.get("depart_robot"), "depart_robot", hauteur, largeur)
     armoire = carte.get("armoire")
     dictionnaire = carte.get("dictionnaire")
@@ -79,6 +97,24 @@ def _valider_carte(carte: dict) -> None:
             f"resident {identifiant}.position",
             hauteur,
             largeur,
+        )
+    positions_symboles = {
+        "depart_robot": tuple(carte["depart_robot"]),
+        "armoire": tuple(armoire["position"]),
+        "dictionnaire": tuple(dictionnaire["position"]),
+    }
+    for resident in residents:
+        positions_symboles[f"resident {resident['id']}"] = tuple(resident["position"])
+    for nom, position in positions_symboles.items():
+        symbole = next(
+            symbole for symbole, nature in legende.items()
+            if nature == ("depart du robot" if nom == "depart_robot" else
+                          "armoire" if nom == "armoire" else
+                          "dictionnaire" if nom == "dictionnaire" else "resident")
+        )
+        _exiger(
+            grille[position[0]][position[1]] == symbole,
+            f"{nom} ne correspond pas au symbole attendu dans la grille",
         )
 
 
@@ -152,6 +188,7 @@ def _valider_armoire(armoire: dict, dictionnaire: dict) -> None:
     )
     casiers = armoire.get("casiers")
     _exiger(isinstance(casiers, list), "armoire.casiers manquant ou invalide")
+    _exiger(len(casiers) == 24, "l'armoire doit contenir 24 casiers")
     positions_vues = set()
     for index, casier in enumerate(casiers):
         _exiger(isinstance(casier, dict), f"casier {index} invalide")
@@ -173,6 +210,10 @@ def _valider_armoire(armoire: dict, dictionnaire: dict) -> None:
             casier.get("emotion") == emotions[colonne]
             and casier.get("intensite") == intensites[ligne],
             f"etiquette incoherente pour le casier {position}",
+        )
+        _exiger(
+            casier.get("objet") is None or isinstance(casier.get("objet"), str),
+            f"objet invalide dans le casier {position}",
         )
 
 
