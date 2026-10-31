@@ -163,7 +163,7 @@ class Agent:
     def memoriser_perception(self, perception: Dict[str, str]) -> None:
         """Ajoute les quatre cases observees a la carte mentale."""
         for (direction, position) in voisins(self.memoire.position):
-            nature= perception[direction]
+            nature = perception[direction]
             self.memoire.carte.mettre_a_jour(position, nature)
     
     #-------------------------------------------------------------------    
@@ -409,6 +409,7 @@ class Agent:
         )
 
     def traiter_demande(self, demande: dict, avec_affichage : Optional[bool]=True) -> None:
+        self.memoire.emotion_indeterminee = False
         for _ in range(10000):
             if avec_affichage:
                 time.sleep(0.25)

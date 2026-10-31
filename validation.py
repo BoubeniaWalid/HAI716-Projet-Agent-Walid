@@ -63,6 +63,18 @@ def _valider_carte(carte: dict) -> None:
         all(symbole in legende for ligne in grille for symbole in ligne),
         "symbole inconnu dans carte.grille",
     )
+    symbole_mur = next(
+        symbole for symbole, nature in legende.items() if nature == "mur"
+    )
+    bordure = (
+        all(symbole == symbole_mur for symbole in grille[0])
+        and all(symbole == symbole_mur for symbole in grille[-1])
+        and all(ligne[0] == symbole_mur and ligne[-1] == symbole_mur for ligne in grille)
+    )
+    _exiger(
+        bordure,
+        "la carte doit etre entouree de murs",
+    )
     _position_valide(carte.get("depart_robot"), "depart_robot", hauteur, largeur)
     armoire = carte.get("armoire")
     dictionnaire = carte.get("dictionnaire")

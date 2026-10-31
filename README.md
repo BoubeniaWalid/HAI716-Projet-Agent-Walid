@@ -9,7 +9,7 @@ sa propre carte mentale pour se déplacer.
 
 ## Pré-requis
 
-- Python 3.9 ou supérieur ;
+- Python 3.10 ou supérieur ;
 - aucune dépendance externe.
 
 Le projet a été vérifié avec Python 3.14 dans l'environnement de développement.
@@ -27,6 +27,7 @@ Le projet a été vérifié avec Python 3.14 dans l'environnement de développem
 | `start.sh` | Lanceur de l'agent |
 | `test.sh` | Lanceur de la suite de tests |
 | `rendu.json` | Métadonnées et commande du rendu |
+| `RAPPORT.tex` | Rapport d'analyse au format LaTeX |
 
 ## Exécuter l'agent
 
@@ -72,7 +73,7 @@ Sous Windows, la commande équivalente est :
 py -3 -m unittest discover -s tests -p "Test*.py" -v
 ```
 
-La suite contient actuellement **48 tests**. Elle vérifie notamment :
+La suite contient actuellement **50 tests**. Elle vérifie notamment :
 
 - la perception locale et la mémoire de la carte ;
 - le calcul de chemins BFS et la replanification ;
@@ -80,6 +81,7 @@ La suite contient actuellement **48 tests**. Elle vérifie notamment :
 - l'ordre des casiers, les intensités et le bouclage horizontal ;
 - les livraisons réussies et les échecs ;
 - les règles de validation des quatre fichiers d'entrée ;
+- la présence d'une bordure de murs autour de chaque carte ;
 - la cohérence de la trace et de son résumé.
 
 ## Fonctionnalités implémentées
@@ -107,12 +109,13 @@ Le scénario fourni `scenario_01.json` s'exécute sans erreur et produit :
 0 échec
 ```
 
-Les autres scénarios fournis sont disponibles dans `cartes/` et peuvent être
-exécutés avec la même commande.
+Les cinq cartes et les cinq scénarios fournis dans `cartes/` ont été vérifiés.
+Ils s'exécutent tous sans erreur et produisent des livraisons réussies. Ils
+peuvent être exécutés avec la même commande.
 
 ## Éléments du rendu
 
 Les métadonnées de l'équipe, du langage, de la commande de lancement et de la
-vidéo sont déclarées dans `rendu.json`. Le rapport et la vidéo de démonstration
-doivent être ajoutés au rendu final s'ils ne sont pas encore présents dans le
-dépôt.
+vidéo sont déclarées dans `rendu.json`. Le rapport d'analyse a été ajouté au
+dépôt dans `RAPPORT.tex`. La vidéo de démonstration doit encore être ajoutée au
+rendu final si elle est exigée par l'enseignant.

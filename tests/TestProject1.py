@@ -85,6 +85,20 @@ class TestProject1(unittest.TestCase):
         self.assertEqual(robot.trace.livraisons[-1]["motif_echec"], "emotion indeterminee")
         self.assertFalse(robot.trace.livraisons[-1]["succes"])
 
+    def test_unknown_emotion_does_not_affect_next_request(self):
+        robot = self.make_agent()
+        robot.traiter_demande(
+            {
+                "numero": 99,
+                "resident": "R1",
+                "message": "xyzzy totalement inconnu",
+            },
+            avec_affichage=False,
+        )
+        robot.traiter_demande(self.scenario["demandes"][0], avec_affichage=False)
+        self.assertEqual(robot.trace.livraisons[-1]["demande"], 1)
+        self.assertTrue(robot.trace.livraisons[-1]["succes"])
+
     def test_empty_cabinet_creates_failure(self):
         armoire = deepcopy(self.armoire)
         for casier in armoire["casiers"]:
@@ -160,6 +174,13 @@ class TestProject1(unittest.TestCase):
                 self.dictionnaire,
                 self.armoire,
             )
+
+    def test_validation_rejects_missing_wall_border(self):
+        carte = deepcopy(self.carte)
+        ligne = list(carte["grille"][1])
+        ligne[0] = "."
+        carte["grille"][1] = "".join(ligne)
+        self.assert_invalid_inputs(carte=carte)
 
     def assert_invalid_inputs(self, carte=None, scenario=None, dictionnaire=None, armoire=None):
         with self.assertRaises(ErreurFichier):
