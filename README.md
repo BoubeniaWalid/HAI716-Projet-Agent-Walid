@@ -28,6 +28,7 @@ Le projet a été vérifié avec Python 3.14 dans l'environnement de développem
 | `test.sh` | Lanceur de la suite de tests |
 | `rendu.json` | Métadonnées et commande du rendu |
 | `RAPPORT.tex` | Rapport d'analyse au format LaTeX |
+| `demo.mkv` | Video de démonstration de l'agent |
 
 ## Exécuter l'agent
 
@@ -117,5 +118,4 @@ peuvent être exécutés avec la même commande.
 
 Les métadonnées de l'équipe, du langage, de la commande de lancement et de la
 vidéo sont déclarées dans `rendu.json`. Le rapport d'analyse a été ajouté au
-dépôt dans `RAPPORT.tex`. La vidéo de démonstration doit encore être ajoutée au
-rendu final si elle est exigée par l'enseignant.
+dépôt dans `RAPPORT.tex` et la vidéo sous le nom `demo.mkv`.
