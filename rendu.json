@@ -13,6 +13,6 @@
     "sorties/trace_01.json",
     "False"
   ],
-  "rapport": "RAPPORT.tex",
+  "rapport": "RAPPORT_SMA.pdf",
   "video": "demo.mkv"
 }
