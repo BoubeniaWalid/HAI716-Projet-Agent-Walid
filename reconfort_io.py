@@ -130,9 +130,10 @@ def charger_scenario(chemin: str | Path) -> Dict[str, Any]:
 class PerceptionLocale:
     """Interface du simulateur qui expose uniquement les cases voisines."""
 
-    def __init__(self, carte: Dict[str, Any]) -> None:
+    def __init__(self, carte: Dict[str, Any], armoire: Optional[Dict[str, Any]] = None) -> None:
         self._grille = carte["grille"]
         self._legende = carte["legende"]
+        self._armoire = armoire
 
     def percevoir(self, position: Sequence[int], direction: str) -> str:
         """Retourne la nature d'une seule case voisine."""
@@ -149,6 +150,26 @@ class PerceptionLocale:
         if row >= len(self._grille) or column >= len(self._grille[row]):
             raise IndexError("Perception d'un voisin hors de la carte")
         return self._legende.get(self._grille[row][column], self._grille[row][column])
+
+    def contenu_casier(self, position: Sequence[int]) -> Optional[str]:
+        """Retourne le contenu du casier courant, uniquement devant l'armoire."""
+        if self._armoire is None:
+            raise RuntimeError("aucune armoire associee au simulateur")
+        for casier in self._armoire["casiers"]:
+            if (casier["ligne"], casier["colonne"]) == tuple(position):
+                return casier["objet"]
+        raise IndexError(f"casier inexistant : {tuple(position)}")
+
+    def prendre_casier(self, position: Sequence[int]) -> Optional[str]:
+        """Retire et retourne l'objet du casier courant dans le simulateur."""
+        if self._armoire is None:
+            raise RuntimeError("aucune armoire associee au simulateur")
+        for casier in self._armoire["casiers"]:
+            if (casier["ligne"], casier["colonne"]) == tuple(position):
+                objet = casier["objet"]
+                casier["objet"] = None
+                return objet
+        raise IndexError(f"casier inexistant : {tuple(position)}")
 
 
 # ---------------------------------------------------------------------------

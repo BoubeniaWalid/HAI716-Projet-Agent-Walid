@@ -20,7 +20,7 @@ class TestPerception(CustomTestCase):
         for direction, voisin in voisins(agent.memoire.position):
             self.assertEqual(carte["legende"][carte["grille"][voisin[0]][voisin[1]]], agent.percevoir_voisin(direction))
 
-    #teste si percevoir_voisin() leve bien une erreur quand l'agent tente de percevoir un voisin hors de la carte(cas normallement impossible)
+    #teste si percevoir un voisin hors de la carte leve une erreur
     def test_perception_voisin_hors_carte_leve_erreur(self):
         carte= self.carte1
         pl= PerceptionLocale(carte)

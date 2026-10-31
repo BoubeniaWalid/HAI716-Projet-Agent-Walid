@@ -1,54 +1,121 @@
-# Robot de réconfort — Boubenia Walid & Barré-Guétrot Ilan
+# Robot de réconfort
 
-Projet de semestre, master informatique. Un robot à perception locale
-consulte un dictionnaire, fouille une armoire et rapporte un objet à un
-résident.
+Projet HAI716 réalisé par **BOUBENIA Walid** et **BARRE-GUETROT Ilan**.
 
-Langage : *python* — Version : *3.12*
+L'agent reçoit les demandes de résidents, identifie leur émotion à l'aide d'un
+dictionnaire, choisit un objet dans une armoire et le livre au résident. Il
+utilise uniquement une perception locale des quatre cases voisines et construit
+sa propre carte mentale pour se déplacer.
 
-## Lancer
+## Pré-requis
 
+- Python 3.10 ou supérieur ;
+- aucune dépendance externe.
+
+Le projet a été vérifié avec Python 3.14 dans l'environnement de développement.
+
+## Organisation des fichiers
+
+| Fichier ou dossier | Rôle |
+|---|---|
+| `agent.py` | Agent, mémoire, perception, BFS, décisions et livraisons |
+| `reconfort_io.py` | Lecture/écriture JSON, simulateur de perception locale et trace |
+| `validation.py` | Validation de la carte, du dictionnaire, de l'armoire et du scénario |
+| `cartes/` | Cinq cartes et cinq scénarios fournis |
+| `donnees/` | Dictionnaire des émotions et armoire standard |
+| `tests/` | Tests de mémoire, perception, navigation, validation et trace |
+| `start.sh` | Lanceur de l'agent |
+| `test.sh` | Lanceur de la suite de tests |
+| `rendu.json` | Métadonnées et commande du rendu |
+| `RAPPORT.tex` | Rapport d'analyse au format LaTeX |
+
+## Exécuter l'agent
+
+La commande générale est :
+
+```text
+python agent.py <carte.json> <scenario.json> <dossier_donnees> <trace.json> [True|False]
 ```
-./start.sh
+
+Le dernier argument est facultatif :
+
+- `True` affiche les cartes mentales pendant l'exécution ;
+- `False` désactive l'affichage.
+
+### Exemple sous Windows
+
+Depuis la racine du projet :
+
+```powershell
+py -3 agent.py cartes\appartement_01.json cartes\scenario_01.json donnees sorties\trace_01.json False
 ```
 
-Dépendances : *aucune*.
+### Exemple sous Linux ou macOS
 
-## Tester
-
+```bash
+./start.sh cartes/appartement_01.json cartes/scenario_01.json donnees sorties/trace_01.json False
 ```
+
+Le fichier de trace est écrit dans le chemin fourni. Le dossier `sorties/` est
+ignoré par Git car il contient des fichiers générés.
+
+## Exécuter les tests
+
+Avec le lanceur fourni :
+
+```bash
 ./test.sh
 ```
 
-*Les tests sont uniquement composés de tests unitaires, ils testent la perception de l'agent et partiellement la mémoire*
+Sous Windows, la commande équivalente est :
 
-## Organisation du code
+```powershell
+py -3 -m unittest discover -s tests -p "Test*.py" -v
+```
 
-| Fichier | Rôle |
-|---|---|
-| `agent.py` | point d'entrée, boucle de décision |
-| `reconfort_io.py` | lecture des fichiers d'entrée et construction du fichier de sortie |
-|`validation.py`| vérification de la validité des fichiers d'entrée|
-|`start.sh`| démarrage du projet|
-|`test.sh`| exécution des tests|
+La suite contient actuellement **50 tests**. Elle vérifie notamment :
 
-## État
+- la perception locale et la mémoire de la carte ;
+- le calcul de chemins BFS et la replanification ;
+- la lecture du premier mot reconnu dans un message ;
+- l'ordre des casiers, les intensités et le bouclage horizontal ;
+- les livraisons réussies et les échecs ;
+- les règles de validation des quatre fichiers d'entrée ;
+- la présence d'une bordure de murs autour de chaque carte ;
+- la cohérence de la trace et de son résumé.
 
-**Ce qui marche.**
-- *La lecture des fichiers d'entrée et la construction d'une trace* 
-- *La vérification de la validité des fichiers d'entrée*
-- *La perception des cases voisines du robot.*
-- *La mémoire du robot (position de l'armoire, carte mentale, objet transporté,etc...)*
-- *La recherche du plus court chemin*
-- *La boucle de décision*
-- *Un affichage console du trajet du robot*
-- *Un fichier de lancement*
-- *Les tests des méthodes de perception et mémoire(partiellement)*
-- *Un fichier de test*
+## Fonctionnalités implémentées
 
-**Ce qui ne marche pas.** 
-- *Les tests des méthodes de mémoire(reste), de décision et de validation des fichiers d'entrée*
+- validation des dimensions, symboles, positions et identifiants ;
+- validation des émotions, intensités, formes du dictionnaire et casiers ;
+- perception limitée aux cases voisines ;
+- carte mentale séparée de la grille réelle ;
+- déplacement par BFS avec mise à jour après chaque perception ;
+- consultation du dictionnaire dans l'ordre des mots du message ;
+- sélection des casiers selon l'émotion, l'intensité et les replis ;
+- déplacement circulaire du sélecteur sur les huit colonnes ;
+- perception et retrait des objets par l'interface du simulateur ;
+- gestion des émotions inconnues, des armoires vides et des chemins
+  inaccessibles ;
+- enregistrement des actions et des résultats dans une trace JSON.
 
-## Vidéo
+## Résultats vérifiés
 
-`demo.mp4` (ou le lien), également déclarée dans `rendu.json`.
+Le scénario fourni `scenario_01.json` s'exécute sans erreur et produit :
+
+```text
+4 demandes
+4 livraisons réussies
+0 échec
+```
+
+Les cinq cartes et les cinq scénarios fournis dans `cartes/` ont été vérifiés.
+Ils s'exécutent tous sans erreur et produisent des livraisons réussies. Ils
+peuvent être exécutés avec la même commande.
+
+## Éléments du rendu
+
+Les métadonnées de l'équipe, du langage, de la commande de lancement et de la
+vidéo sont déclarées dans `rendu.json`. Le rapport d'analyse a été ajouté au
+dépôt dans `RAPPORT.tex`. La vidéo de démonstration doit encore être ajoutée au
+rendu final si elle est exigée par l'enseignant.

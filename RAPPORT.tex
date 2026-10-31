@@ -1,0 +1,262 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit}
+
+\geometry{margin=2.2cm}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\definecolor{softblue}{RGB}{225,238,249}
+\definecolor{softgreen}{RGB}{229,242,231}
+\definecolor{softorange}{RGB}{252,237,214}
+\definecolor{softpurple}{RGB}{239,231,247}
+\definecolor{softgray}{RGB}{242,244,246}
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  breaklines=true
+}
+
+\title{\textbf{Rapport d'analyse}\\
+       \large Robot de réconfort}
+\author{BOUBENIA Walid \and BARRE-GUETROT Ilan}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Architecture}
+
+L'architecture du projet est organisée autour d'un contrôleur principal et de
+composants spécialisés :
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=8mm and 12mm,
+  box/.style={
+    draw=black!65,
+    rounded corners=2pt,
+    align=center,
+    minimum height=10mm,
+    text width=32mm,
+    font=\small
+  },
+  input/.style={box, fill=softgray},
+  control/.style={box, fill=softblue, text width=48mm, minimum height=12mm},
+  service/.style={box, fill=softorange},
+  agent/.style={box, fill=softgreen, text width=42mm},
+  state/.style={box, fill=softpurple, text width=38mm},
+  output/.style={box, fill=softgray},
+  arrow/.style={-{Latex[length=2.5mm]}, thick, black!65}
+]
+  \node[input] (json) {Entrées JSON\\carte, scénario, données};
+  \node[control, below=of json] (main)
+    {\textbf{agent.py}\\chargement et orchestration};
+
+  \node[service, below left=13mm and 3mm of main] (validation)
+    {\textbf{validation.py}\\contrôle de cohérence};
+  \node[service, below right=13mm and 3mm of main] (io)
+    {\textbf{reconfort\_io.py}\\lecture et simulateur local};
+
+  \node[agent, below=25mm of main] (robot)
+    {\textbf{Agent}\\perception, décision et actions};
+  \node[state, below=of robot] (memory)
+    {\textbf{Mémoire}\\CarteMentale + MemoireRobot};
+  \node[state, below=of memory] (planning)
+    {\textbf{Planification}\\BFS et sélection du casier};
+  \node[output, below=of planning] (trace)
+    {\textbf{Trace JSON}\\pas, livraisons, résumé};
+
+  \draw[arrow] (json) -- (main);
+  \draw[arrow] (main) -- (validation);
+  \draw[arrow] (main) -- (io);
+  \draw[arrow] (main) -- (robot);
+  \draw[arrow] (io) -- (robot)
+    node[midway, right, font=\scriptsize, align=left] {perception\\et casiers};
+  \draw[arrow] (validation) |- (robot);
+  \draw[arrow] (robot) -- (memory);
+  \draw[arrow] (memory) -- (planning);
+  \draw[arrow] (planning) -- (trace);
+\end{tikzpicture}
+\end{center}
+\vspace{2mm}
+\begin{center}
+\small
+\textit{Les flèches représentent le flux de contrôle et d'informations.}
+\end{center}
+
+Les frontières entre les composants sont volontaires :
+
+\begin{itemize}
+  \item \textbf{Perception :} \texttt{PerceptionLocale}, dans
+  \href{run:reconfort_io.py}{\texttt{reconfort\_io.py}}, est la seule
+  interface qui consulte la grille réelle. Elle expose uniquement les quatre
+  cases voisines et le contenu du casier lorsque le robot est devant
+  l'armoire. Cela respecte la contrainte de perception locale.
+
+  \item \textbf{Mémoire :} \texttt{CarteMentale} et
+  \texttt{MemoireRobot}, dans \texttt{agent.py}, stockent ce que le robot a
+  découvert et son état courant. Cette séparation empêche la planification de
+  lire directement la carte réelle et permet de tester la mémoire
+  indépendamment du simulateur.
+
+  \item \textbf{Décision :} \texttt{Agent.choisir\_action} utilise la
+  perception et la mémoire pour choisir \texttt{AVANCER},
+  \texttt{CONSULTER}, \texttt{CHERCHER}, \texttt{PRENDRE},
+  \texttt{DONNER} ou \texttt{ATTENDRE}. La décision ne modifie pas
+  directement la grille simulée.
+
+  \item \textbf{Action :} \texttt{executer\_action} applique l'action à
+  l'état interne, appelle l'interface de prise si nécessaire et journalise
+  l'état avant l'action. \texttt{Trace} est séparée afin que la journalisation
+  n'influence pas la décision.
+
+  \item \textbf{Validation :} \texttt{validation.py} est exécuté avant la
+  simulation. Il vérifie la cohérence des cartes, scénarios, dictionnaires et
+  casiers, au lieu de disperser ces contrôles dans l'agent.
+\end{itemize}
+
+Le flux principal est donc :
+\[
+\begin{aligned}
+\texttt{charger\_entrees}
+&\longrightarrow \texttt{valider\_entrees}
+\longrightarrow \text{création du simulateur et de l'agent}\\
+&\longrightarrow \texttt{percevoir}
+\longrightarrow \text{mémoriser}
+\longrightarrow \texttt{choisir\_action}\\
+&\longrightarrow \texttt{executer\_action}
+\longrightarrow \texttt{Trace}.
+\end{aligned}
+\]
+
+\section{Stratégie de replanification}
+
+Le robot \textbf{replanifie entièrement} son chemin, plutôt que de réparer une
+partie du plan. À chaque itération de \texttt{traiter\_demande}, il observe les
+quatre voisins, met à jour la carte mentale, puis appelle indirectement
+\texttt{plus\_court\_chemin}, qui effectue un BFS depuis la position courante
+vers une case adjacente à la cible.
+
+Lorsqu'un mur est découvert, \texttt{memoriser\_perception} inscrit la nature
+\texttt{mur} dans \texttt{CarteMentale}. Le BFS suivant exclut alors cette
+case et reconstruit un nouveau chemin avec les informations disponibles. Les
+cases encore inconnues sont provisoirement considérées comme traversables ;
+elles seront corrigées par les perceptions suivantes.
+
+Le coût d'une replanification est
+\(\mathcal{O}(H\times L)\) dans le pire cas pour une carte de \(H\times L\)
+cases, avec \(\mathcal{O}(H\times L)\) de mémoire pour les parents et les
+cases visitées. Cette solution est plus simple et plus sûre qu'une réparation
+locale : elle garantit que le chemin utilisé tient compte de tous les murs
+connus. Son inconvénient est de recalculer le chemin après chaque action, même
+si la modification de la carte est faible. Pour les petites grilles du
+projet, ce coût reste acceptable.
+
+\section{Critique de la règle de repli}
+
+La règle imposée en section 6.2 est déterministe, mais elle est discutable :
+une émotion demandée est remplacée par une émotion voisine sur la roue, sans
+tenir compte de la signification de l'objet. Une personne triste peut donc
+recevoir un objet associé au dégoût. La proximité sur la roue de Plutchik ne
+garantit pas une proximité de besoin ou de confort. La règle est défendable
+comme solution de secours lorsque le casier exact est vide, mais elle ne
+devrait pas être interprétée comme une équivalence psychologique.
+
+Une meilleure règle serait :
+
+\begin{enumerate}
+  \item chercher d'abord un casier de l'émotion exacte et de l'intensité
+  exacte ;
+  \item si aucun objet n'est disponible, chercher l'émotion exacte avec une
+  intensité voisine ;
+  \item ensuite seulement, utiliser une émotion voisine, en privilégiant une
+  table de compatibilité sémantique définie pour le projet ;
+  \item si aucun objet compatible n'existe, signaler explicitement l'échec
+  plutôt que choisir automatiquement une émotion potentiellement inadaptée.
+\end{enumerate}
+
+Dans l'implémentation actuelle, la distance émotionnelle est limitée à
+\textbf{2 positions} sur la roue. Ainsi, une distance de \(0\) correspond à
+l'émotion exacte, une distance de \(1\) à une émotion voisine et une distance
+de \(2\) à une émotion située deux positions plus loin. Les émotions à
+distance \(3\) ou \(4\) sont ignorées. La distance est circulaire : la
+première et la dernière émotion de la liste sont donc voisines. Cette limite
+est appliquée dans \texttt{Agent.\_casiers\_candidats} par la condition
+\texttt{if distance > 2}.
+
+Il n'existe pas de limite stricte équivalente pour l'intensité : les trois
+niveaux restent candidats, mais ils sont classés selon leur écart avec
+l'intensité demandée. Le tri privilégie donc d'abord l'émotion exacte, puis
+l'intensité la plus proche.
+
+Pour mettre cette règle en œuvre, il faudrait modifier
+\texttt{Agent.\_casiers\_candidats} dans \texttt{agent.py} afin de produire des
+priorités par niveaux de compatibilité, au lieu d'utiliser uniquement la
+distance circulaire. 
+
+
+
+\section{Trois situations où le robot se comporte mal}
+
+\subsection{Échec explicite : une émotion inconnue}
+
+Si une demande ne contient aucun mot du dictionnaire,
+\texttt{\_lire\_emotion\_message} renvoie \texttt{None} et
+\texttt{emotion\_indeterminee} est placé à \texttt{True}. La demande est alors
+classée en \texttt{ATTENDRE} et enregistrée comme un échec avec le motif
+\texttt{emotion indeterminee}. Le robot ne peut donc pas choisir d'objet ni
+effectuer la livraison. Ce comportement est volontaire : sans émotion
+identifiée, une réponse automatique serait arbitraire.
+
+Un ancien problème d'état mémoire a été corrigé : le drapeau
+\texttt{emotion\_indeterminee} est maintenant remis à \texttt{False} au début de
+\texttt{traiter\_demande}. Une demande inconnue ne bloque donc plus les
+demandes valides suivantes.
+
+\subsection{Échec explicite : une armoire vide}
+
+Après identification de l'émotion, le robot explore les casiers candidats.
+Lorsque tous les casiers compatibles ont été observés comme vides,
+\texttt{choisir\_action} renvoie \texttt{ATTENDRE}. La livraison est alors
+enregistrée avec le motif \texttt{armoire vide}.
+
+Ce cas est correctement signalé, mais aucune solution de remplacement n'est
+proposée lorsque tous les objets pertinents sont indisponibles. Une évolution
+possible serait de proposer un objet d'une autre catégorie selon une règle de
+compatibilité explicite, ou de transmettre la demande à un autre robot.
+
+\subsection{Échec explicite : un résident inaccessible}
+
+Si aucun chemin vers une case adjacente au résident n'est trouvé dans la carte
+mentale, \texttt{\_direction\_vers} renvoie \texttt{None}. Le robot s'arrête
+avec l'action \texttt{ATTENDRE} et la trace indique
+\texttt{resident inaccessible}. Il ne tente pas de déplacer un mur et ne
+produit pas de fausse livraison.
+
+La limite est que \texttt{ATTENDRE} est utilisé comme état terminal : le robot
+ne dispose pas d'une stratégie de recherche plus avancée ou de coopération
+pour rendre la cible accessible. Pour améliorer ce comportement, il faudrait
+ajouter une phase d'exploration contrôlée, ou un motif d'échec distinct
+indiquant que la zone a été entièrement explorée.
+
+\paragraph{Autre limite étudiée.}
+La règle de repli par distance circulaire peut aussi fournir un objet d'une
+émotion voisine peu adaptée, par exemple un objet associé au dégoût pour une
+personne triste. Ce point n'est pas un bug par rapport à l'énoncé : le code
+applique bien la règle imposée. Il est analysé dans la section précédente
+comme une limite de conception.
+
+\end{document}

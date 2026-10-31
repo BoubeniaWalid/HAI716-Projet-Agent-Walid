@@ -65,6 +65,7 @@ class MemoireRobot:
     contenus_casiers: Dict[Position, Optional[str]] = field(default_factory=dict)
     emotion_resident: Optional[Tuple[str, str]] = None
     objet_transporte: Optional[str] = None
+    emotion_indeterminee: bool = False
 
 #-------------------------------------------------------------------
 
@@ -121,6 +122,8 @@ class Agent:
         armoire: dict,
         trace: rio.Trace,
         perception_locale: Callable[[Position, str], str],
+        contenu_casier: Optional[Callable[[Position], Optional[str]]] = None,
+        prendre_casier: Optional[Callable[[Position], Optional[str]]] = None,
     ) -> None:
         dimensions = carte["dimensions"]
         depart = tuple(carte["depart_robot"])
@@ -130,6 +133,8 @@ class Agent:
         self.armoire = armoire
         self.trace = trace
         self.perception_locale = perception_locale
+        self.perception_contenu_casier = contenu_casier
+        self.prendre_casier = prendre_casier
         self.memoire = MemoireRobot(
             position=depart,
             casier=casier_depart,
@@ -158,7 +163,7 @@ class Agent:
     def memoriser_perception(self, perception: Dict[str, str]) -> None:
         """Ajoute les quatre cases observees a la carte mentale."""
         for (direction, position) in voisins(self.memoire.position):
-            nature= perception[direction]
+            nature = perception[direction]
             self.memoire.carte.mettre_a_jour(position, nature)
     
     #-------------------------------------------------------------------    
@@ -224,31 +229,75 @@ class Agent:
                     return direction
         return None
 
-    def _lire_emotion_message(self, message: str) -> Tuple[str, str]:
-        mots = set(rio.normaliser(message))
-        for entree in self.dictionnaire["entrees"]:
-            if any(forme in mots for forme in entree["formes"]):
-                return entree["emotion"], entree["intensite"]
-        return self.dictionnaire["emotions"][0], self.dictionnaire["intensites"][0]
+    def _lire_emotion_message(self, message: str) -> Optional[Tuple[str, str]]:
+        formes = {
+            forme: (entree["emotion"], entree["intensite"])
+            for entree in self.dictionnaire["entrees"]
+            for forme in entree["formes"]
+        }
+        for mot in rio.normaliser(message):
+            if mot in formes:
+                return formes[mot]
+        return None
 
-    def _choisir_objet(self) -> Tuple[Optional[str], Optional[Position]]:
+    def _casiers_candidats(self) -> List[Position]:
         if self.memoire.emotion_resident is None:
-            return None, None
+            return []
         emotion, intensite = self.memoire.emotion_resident
+        emotions = self.dictionnaire["emotions"]
+        intensites = self.dictionnaire["intensites"]
+        emotion_index = emotions.index(emotion)
+        intensite_index = intensites.index(intensite)
+        candidats: List[Tuple[Tuple[int, int, int, int], Position]] = []
         for casier in self.armoire["casiers"]:
-            if casier.get("objet") is None:
+            index = casier["colonne"]
+            ecart = abs(index - emotion_index)
+            distance = min(ecart, len(emotions) - ecart)
+            if distance > 2:
                 continue
-            if casier["emotion"] == emotion and casier["intensite"] == intensite:
-                return casier["objet"], (casier["ligne"], casier["colonne"])
-        for casier in self.armoire["casiers"]:
-            if casier.get("objet") is None:
-                continue
-            if casier["emotion"] == emotion:
-                return casier["objet"], (casier["ligne"], casier["colonne"])
-        for casier in self.armoire["casiers"]:
-            if casier.get("objet") is not None:
-                return casier["objet"], (casier["ligne"], casier["colonne"])
-        return None, None
+            sens = 0 if (index - emotion_index) % len(emotions) <= len(emotions) // 2 else 1
+            cle = (
+                distance,
+                abs(casier["ligne"] - intensite_index),
+                casier["ligne"],
+                sens,
+            )
+            candidats.append((cle, (casier["ligne"], casier["colonne"])))
+        return [position for _, position in sorted(candidats)]
+
+    def _observer_casier(self) -> Optional[str]:
+        if self.perception_contenu_casier is None:
+            raise RuntimeError("perception du contenu des casiers non configuree")
+        if not self._adjacent_a(tuple(self.carte["armoire"]["position"])):
+            return None
+        position = self.memoire.casier
+        if position not in self.memoire.contenus_casiers:
+            self.memoire.contenus_casiers[position] = self.perception_contenu_casier(position)
+        return self.memoire.contenus_casiers[position]
+
+    def _direction_vers_casier(self, cible: Position) -> Optional[str]:
+        row, column = self.memoire.casier
+        delta_row = cible[0] - row
+        if delta_row:
+            return "S" if delta_row > 0 else "N"
+        delta_column = (cible[1] - column) % 8
+        if delta_column == 0:
+            return None
+        if delta_column <= 4:
+            return "E"
+        return "O"
+
+    def _repli_pour_casier(self, casier: Position) -> str:
+        if self.memoire.emotion_resident is None:
+            return "aucun"
+        emotion, intensite = self.memoire.emotion_resident
+        emotions = self.dictionnaire["emotions"]
+        intensites = self.dictionnaire["intensites"]
+        distance = abs(emotions.index(emotion) - casier[1])
+        distance = min(distance, len(emotions) - distance)
+        if distance == 0:
+            return "aucun" if intensites.index(intensite) == casier[0] else "intensite"
+        return f"voisine_{distance}"
 
     def choisir_action(self, demande: dict) -> Tuple[str, Optional[str]]:
         """Retourne l'action suivante."""
@@ -256,6 +305,8 @@ class Agent:
         self.memoriser_perception(perception)
 
         if self.memoire.emotion_resident is None:
+            if self.memoire.emotion_indeterminee:
+                return "ATTENDRE", None
             if "dictionnaire" in perception.values():
                 return "CONSULTER", None
             direction = self._direction_vers(
@@ -265,7 +316,26 @@ class Agent:
 
         if self.memoire.objet_transporte is None:
             if "armoire" in perception.values():
-                return "PRENDRE", None
+                candidats = self._casiers_candidats()
+                if not candidats:
+                    return "ATTENDRE", None
+                contenu = self._observer_casier()
+                cible = next(
+                    (
+                        position for position in candidats
+                        if position not in self.memoire.contenus_casiers
+                        or self.memoire.contenus_casiers[position] is not None
+                    ),
+                    None,
+                )
+                if cible is None:
+                    return "ATTENDRE", None
+                if self.memoire.casier == cible:
+                    if contenu is not None:
+                        return "PRENDRE", None
+                direction = self._direction_vers_casier(cible)
+                if direction is not None:
+                    return "CHERCHER", direction
             direction = self._direction_vers(
                 tuple(self.carte["armoire"]["position"])
             )
@@ -275,6 +345,8 @@ class Agent:
         if self._adjacent_a(resident):
             return "DONNER", demande["resident"]
         direction = self._direction_vers(resident)
+        if direction is None:
+            return "ATTENDRE", None
         return "AVANCER", direction
 
     def _resident_position(self, resident_id: str) -> Position:
@@ -293,6 +365,7 @@ class Agent:
         """Journalise une action et met a jour l'etat interne du robot."""
         position_avant = self.memoire.position
         casier_avant = self.memoire.casier
+        contenu_casier_avant = self.memoire.contenus_casiers.get(casier_avant)
 
         if action == "AVANCER" and argument in DIRECTIONS:
             row, column = self.memoire.position
@@ -301,14 +374,22 @@ class Agent:
         elif action == "CHERCHER" and argument in DIRECTIONS:
             row, column = self.memoire.casier
             row_delta, column_delta = DIRECTIONS[argument]
-            self.memoire.casier = (row + row_delta, column + column_delta)
+            new_row = row + row_delta
+            new_column = (column + column_delta) % 8 if row_delta == 0 else column
+            if not 0 <= new_row < 3:
+                raise ValueError("deplacement illegal du selecteur")
+            self.memoire.casier = (new_row, new_column)
         elif action == "CONSULTER":
-            self.memoire.emotion_resident = self._lire_emotion_message(demande["message"])
+            emotion = self._lire_emotion_message(demande["message"])
+            if emotion is None:
+                self.memoire.emotion_indeterminee = True
+            else:
+                self.memoire.emotion_resident = emotion
         elif action == "PRENDRE":
-            objet, casier = self._choisir_objet()
-            self.memoire.objet_transporte = objet
-            if casier is not None:
-                self.memoire.casier = casier
+            if self.prendre_casier is None:
+                raise RuntimeError("prise des objets non configuree")
+            self.memoire.objet_transporte = self.prendre_casier(self.memoire.casier)
+            self.memoire.contenus_casiers[self.memoire.casier] = None
         elif action == "DONNER":
             self.memoire.objet_transporte = None
 
@@ -319,11 +400,17 @@ class Agent:
             action=action,
             argument=argument,
             perception=perception,
+            contenu_casier=(
+                contenu_casier_avant
+                if self._adjacent_a(tuple(self.carte["armoire"]["position"]))
+                else None
+            ),
             commentaire=None,
         )
 
     def traiter_demande(self, demande: dict, avec_affichage : Optional[bool]=True) -> None:
-        while True:
+        self.memoire.emotion_indeterminee = False
+        for _ in range(10000):
             if avec_affichage:
                 time.sleep(0.25)
             action, argument = self.choisir_action(demande)
@@ -346,7 +433,7 @@ class Agent:
                     emotion=emotion,
                     intensite=intensite,
                     casier_choisi=casier_choisi,
-                    repli="aucun",
+                    repli=self._repli_pour_casier(casier_choisi),
                     objet=objet,
                     succes=True,
                     motif_echec=None,
@@ -354,8 +441,31 @@ class Agent:
                 self.memoire.emotion_resident = None
                 self.memoire.objet_transporte = None
                 break
+            if action == "ATTENDRE":
+                emotion, intensite = self.memoire.emotion_resident or (None, None)
+                motif = (
+                    "emotion indeterminee"
+                    if self.memoire.emotion_indeterminee
+                    else "armoire vide"
+                    if self.memoire.emotion_resident is not None and self.memoire.objet_transporte is None
+                    else "resident inaccessible"
+                )
+                self.trace.ajouter_livraison(
+                    demande=demande["numero"],
+                    resident=demande["resident"],
+                    emotion=emotion,
+                    intensite=intensite,
+                    casier_choisi=None,
+                    repli="aucun",
+                    objet=None,
+                    succes=False,
+                    motif_echec=motif,
+                )
+                break
             if action in {"CONSULTER", "PRENDRE"}:
                 continue
+        else:
+            raise RuntimeError("nombre maximal d'actions depasse")
 
     def executer(self, demandes: Sequence[dict], avec_affichage : Optional[bool]=True) -> None:
         if avec_affichage:
@@ -365,7 +475,7 @@ class Agent:
 
 
 def charger_entrees(argv: Sequence[str]):
-    if len(argv) != 6:
+    if len(argv) not in {5, 6}:
         raise rio.ErreurFichier(
             "usage : agent.py carte.json scenario.json donnees trace.json avec_affichage(bool)"
         )
@@ -374,7 +484,7 @@ def charger_entrees(argv: Sequence[str]):
     chemin_scenario = Path(argv[2])
     dossier_donnees = Path(argv[3])
     chemin_sortie = Path(argv[4])
-    avec_affichage = (argv[5]=="True")
+    avec_affichage = len(argv) == 6 and argv[5] == "True"
 
     carte = rio.charger_carte(chemin_carte)
     scenario = rio.charger_scenario(chemin_scenario)
@@ -396,13 +506,15 @@ def main(argv: Sequence[str]) -> int:
             nom_scenario=scenario["nom"],
             equipe=["BOUBENIA Walid", "BARRE-GUETROT Ilan"],
         )
-        simulateur = rio.PerceptionLocale(carte)
+        simulateur = rio.PerceptionLocale(carte, armoire)
         agent = Agent(
             carte,
             dictionnaire,
             armoire,
             trace,
             simulateur.percevoir,
+            simulateur.contenu_casier,
+            simulateur.prendre_casier,
         )
         agent.executer(scenario["demandes"], avec_affichage)
         trace.ecrire(chemin_sortie)
