@@ -19,14 +19,14 @@ BASE = Path(__file__).parent.parent
 
 
 class TestProject1(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.carte = charger_carte(BASE / "cartes/appartement_01.json")
-        cls.scenario = json.loads(
+    def setUp(self):
+        self.carte = charger_carte(BASE / "cartes/appartement_01.json")
+        self.scenario = json.loads(
             (BASE / "cartes/scenario_01.json").read_text(encoding="utf-8")
         )
-        cls.dictionnaire = charger_dictionnaire(BASE / "donnees/dictionnaire.json")
-        cls.armoire = charger_armoire(BASE / "donnees/armoire_standard.json")
+        self.dictionnaire = charger_dictionnaire(BASE / "donnees/dictionnaire.json")
+        self.armoire = charger_armoire(BASE / "donnees/armoire_standard.json")
+        
 
     def make_agent(self):
         simulateur = PerceptionLocale(self.carte, self.armoire)

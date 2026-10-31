@@ -15,13 +15,18 @@ arg3=""
 arg4=""
 arg5=""
 
-if [ $# -lt 1 ]; then
+if [ $# -lt 1 ] || ([ $# -eq 1 ] && [[ $1 == "-a" || $1 == "-A" || $1 == "--avec_affichage" ]]); then
+    if [ $# -eq 1 ]; then
+        arg5="True"
+    else
+        :
+    fi
     read -p "quel appartement (soit chemin_complet ou nom_fichier ou numero)? (${arg1ParDefaut}) : " arg1
     if [ -z $arg1 ]; then
         arg1=$arg1ParDefaut
     else
         if ! [[ $arg1 == *"/"* ]] ; then
-            if ! [ -f $arg2 ] ; then
+            if ! [ -f $arg1 ] ; then
                 if [[ $arg1 =~ ^[0-9]+$ ]]; then
                     arg1="${dossierParDefaut}${fichier1ParDefaut}${arg1}${type}" 
                 else 
@@ -37,7 +42,7 @@ if [ $# -lt 1 ]; then
 else
     arg1=$1
     if ! [[ $arg1 == *"/"* ]] ; then
-        if ! [ -f $arg2 ] ; then
+        if ! [ -f $arg1 ] ; then
             if [[ $arg1 =~ ^[0-9]+$ ]]; then
                 arg1="${dossierParDefaut}${fichier1ParDefaut}${arg1}${type}" 
             else 
@@ -51,7 +56,12 @@ else
     fi
 fi
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 2 ] || ([ $# -eq 2 ] && [[ $2 == "-a" || $2 == "-A" || $2 == "--avec_affichage" ]]); then
+    if [ $# -eq 2 ]; then
+        arg5="True"
+    else
+        :
+    fi
     read -p "quel scenario (soit chemin_complet ou nom_fichier ou numero)? (${arg2ParDefaut}) : " arg2
     if [ -z $arg2 ]; then
         arg2=$arg2ParDefaut
@@ -87,7 +97,12 @@ else
     fi
 fi
 
-if [ $# -lt 3 ]; then
+if [ $# -lt 3 ] || ([ $# -eq 3 ] && [[ $3 == "-a" || $3 == "-A" || $3 == "--avec_affichage" ]]); then
+    if [ $# -eq 3 ]; then
+        arg5="True"
+    else
+        :
+    fi
     read -p "quel dossier de donnees ? (${arg3ParDefaut}) : " arg3
     if [ -z $arg3 ]; then
         arg3=$arg3ParDefaut
@@ -98,7 +113,12 @@ else
     arg3=$3
 fi
 
-if [ $# -lt 4 ]; then
+if [ $# -lt 4 ] || ([ $# -eq 4 ] && [[ $4 == "-a" || $4 == "-A" || $4 == "--avec_affichage" ]]); then
+    if [ $# -eq 4 ]; then
+        arg5="True"
+    else
+        :
+    fi
     read -p "quel fichier de sortie? (${arg4ParDefaut}) : " arg4
     if [ -z $arg4 ]; then
         arg4=$arg4ParDefaut
@@ -113,15 +133,23 @@ if [ $# -eq 5 ]; then
     if [[ $5 == "True" || $5 == "False" ]]; then
         arg5=$5
     else
-        echo "Argument 5 incorrect, attendu: 'True' ou 'False' ; recu: '$5'"
-        exit 0
+        if [[ $5 == "-a" || $5 == "-A" || $5 == "--avec_affichage" ]]; then
+            arg5="True"
+        else
+            echo "Argument 5 incorrect, attendu: 'True' ou 'False' ; recu: '$5'"
+            exit 0
+        fi
     fi
 else
-    arg5=$arg5ParDefaut
+    if [[ $arg5 == "" ]]; then
+        arg5=$arg5ParDefaut
+    else
+        :
+    fi
 fi
 
 if [ $# -gt 5 ]; then
-    echo "Usage: $0 <appartement> <scenario> <dossier_donnees> <fichier_sortie> [avec_affichage?]"
+    echo "Usage: $0 <appartement> <scenario> <dossier_donnees> <fichier_sortie> [avec_affichage=True/False/-a]"
     echo "L'appartement et le scenario peuvent etre soit le chemin complet, soit le nom du fichier si il se situe dans ${dossierParDefaut}, soit le numero du fichier si son nom commence par ${fichier1ParDefaut} ou ${fichier2ParDefaut} et se situe dans ${dossierParDefaut}."
     exit 0
 else
