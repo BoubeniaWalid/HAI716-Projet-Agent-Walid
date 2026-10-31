@@ -1,7 +1,7 @@
 #!/bin/bash
 
-dossier="tests"
-pattern="Test*.py"
+dossier="."
+pattern="tests*"
 
 arg_s="-s ${dossier}"
 arg_p="-p ${pattern}"

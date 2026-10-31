@@ -1,4 +1,4 @@
-from CustomTestCase import CustomTestCase
+from tests.CustomTestCase import CustomTestCase
 from agent import Agent, voisins
 from reconfort_io import PerceptionLocale, Trace
 
