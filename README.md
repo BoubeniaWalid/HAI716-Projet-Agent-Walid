@@ -1,5 +1,7 @@
 # Robot de réconfort
 
+[Dépôt GitHub du projet](https://github.com/BoubeniaWalid/HAI716-Projet-Agent-Walid)
+
 Projet HAI716 réalisé par **BOUBENIA Walid** et **BARRE-GUETROT Ilan**.
 
 L'agent reçoit les demandes de résidents, identifie leur émotion à l'aide d'un
@@ -102,20 +104,15 @@ La suite contient actuellement **50 tests**. Elle vérifie notamment :
 
 ## Résultats vérifiés
 
-Le scénario fourni `scenario_01.json` s'exécute sans erreur et produit :
 
-```text
-4 demandes
-4 livraisons réussies
-0 échec
-```
 
-Les cinq cartes et les cinq scénarios fournis dans `cartes/` ont été vérifiés.
-Ils s'exécutent tous sans erreur et produisent des livraisons réussies. Ils
-peuvent être exécutés avec la même commande.
+Les cinq cartes fournies (`appartement_01.json` à
+`appartement_05.json`) et leurs cinq scénarios associés ont tous été vérifiés.
+Chaque carte s'exécute sans erreur avec son scénario et produit uniquement des
+livraisons réussies. Ils peuvent être exécutés avec la même commande.
 
 ## Éléments du rendu
 
 Les métadonnées de l'équipe, du langage, de la commande de lancement et de la
 vidéo sont déclarées dans `rendu.json`. Le rapport d'analyse a été ajouté au
-dépôt dans `RAPPORT.tex` et la vidéo sous le nom `demo.mkv`.
+dépôt dans `RAPPORT_SMA.pdf` et la vidéo sous le nom `demo.mkv`.
